@@ -19,22 +19,19 @@ st.set_page_config(
 )
 
 # Generate dummy data for multiple department managers
-def generate_dummy_data():
-    departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Product']
-    roles = ['Manager', 'Senior', 'Mid-level', 'Junior']
-    
-    employees = []
-    for i in range(50):
-        dept = random.choice(departments)
-        role = random.choice(roles)
-        employees.append({
-            'id': i+1,
-            'name': fake.name(),
-            'department': dept,
-            'role': role,
-            'email': fake.email(),
-            'join_date': fake.date_between(start_date='-5y', end_date='today'),
-            'manager': random.choice([True, False]) if role == 'Manager' else False
+# In generate_dummy_data() function, modify the check-in generation:
+for emp in employees:
+    # Ensure each employee has at least 5 check-ins
+    for days_ago in range(5, 35):  # Last 30 days but skip first 5 to ensure recency
+        date = datetime.now() - timedelta(days=days_ago)
+        check_in_data.append({
+            'employee_id': emp['id'],
+            'date': date.date(),
+            'stress': random.randint(1, 10),
+            'energy': random.randint(1, 10),
+            'motivation': random.randint(1, 10),
+            'work_enjoyment': random.randint(1, 10),
+            'notes': random.choice(["", fake.sentence(), ""])
         })
     
     # Create check-in data for last 30 days
@@ -79,6 +76,7 @@ performance_df = data['performance']
 
 # Calculate derived metrics
 def calculate_metrics(employee_id=None, department=None):
+    # Get relevant check-ins
     if employee_id:
         emp_check_ins = check_ins_df[check_ins_df['employee_id'] == employee_id]
         emp_performance = performance_df[performance_df['employee_id'] == employee_id]
@@ -90,7 +88,17 @@ def calculate_metrics(employee_id=None, department=None):
         emp_check_ins = check_ins_df
         emp_performance = performance_df
     
-    # Calculate weekly averages
+    # Handle case where no check-ins exist
+    if emp_check_ins.empty:
+        return {
+            'weekly_avg': {'stress': 5, 'energy': 5, 'motivation': 5, 'work_enjoyment': 5},
+            'monthly_avg': {'stress': 5, 'energy': 5, 'motivation': 5, 'work_enjoyment': 5},
+            'burnout_risk': "Low",
+            'avg_kpi': 75,
+            'latest_date': datetime.now().date()
+        }
+    
+    # Calculate weekly/monthly averages
     latest_date = emp_check_ins['date'].max()
     week_ago = latest_date - timedelta(days=7)
     month_ago = latest_date - timedelta(days=30)
@@ -98,8 +106,20 @@ def calculate_metrics(employee_id=None, department=None):
     weekly_check_ins = emp_check_ins[emp_check_ins['date'] >= week_ago]
     monthly_check_ins = emp_check_ins[emp_check_ins['date'] >= month_ago]
     
-    weekly_avg = weekly_check_ins[['stress', 'energy', 'motivation', 'work_enjoyment']].mean()
-    monthly_avg = monthly_check_ins[['stress', 'energy', 'motivation', 'work_enjoyment']].mean()
+    # Calculate averages with fallback values
+    weekly_avg = {
+        'stress': weekly_check_ins['stress'].mean() if not weekly_check_ins.empty else 5,
+        'energy': weekly_check_ins['energy'].mean() if not weekly_check_ins.empty else 5,
+        'motivation': weekly_check_ins['motivation'].mean() if not weekly_check_ins.empty else 5,
+        'work_enjoyment': weekly_check_ins['work_enjoyment'].mean() if not weekly_check_ins.empty else 5
+    }
+    
+    monthly_avg = {
+        'stress': monthly_check_ins['stress'].mean() if not monthly_check_ins.empty else 5,
+        'energy': monthly_check_ins['energy'].mean() if not monthly_check_ins.empty else 5,
+        'motivation': monthly_check_ins['motivation'].mean() if not monthly_check_ins.empty else 5,
+        'work_enjoyment': monthly_check_ins['work_enjoyment'].mean() if not monthly_check_ins.empty else 5
+    }
     
     # Calculate burnout risk
     burnout_risk = "Low"
@@ -109,8 +129,7 @@ def calculate_metrics(employee_id=None, department=None):
         burnout_risk = "Moderate"
     
     # Performance metrics
-    latest_performance = emp_performance[emp_performance['month'] == datetime.now().month]
-    avg_kpi = latest_performance['kpi'].mean()
+    avg_kpi = emp_performance['kpi'].mean() if not emp_performance.empty else 75
     
     return {
         'weekly_avg': weekly_avg,
