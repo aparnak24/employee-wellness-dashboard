@@ -8,7 +8,12 @@ import random
 from faker import Faker
 
 # Initialize faker for dummy data
-fake = Faker()
+fake = Faker()  # <-- This needs to come BEFORE any fake.xxx() calls
+
+# Initialize data at the module level (top of app.py)
+@st.cache_resource
+def load_data():
+    return generate_dummy_data()
 
 # Set page config
 st.set_page_config(
@@ -73,11 +78,11 @@ def generate_dummy_data():
         'performance': pd.DataFrame(performance_data)
     }
 
-# # Load dummy data
-# data = generate_dummy_data()
-# employees_df = data['employees']
-# check_ins_df = data['check_ins']
-# performance_df = data['performance']
+# Load data once when the app starts
+data = load_data()
+employees_df = data['employees']
+check_ins_df = data['check_ins']
+performance_df = data['performance']
 
 # Calculate derived metrics
 def calculate_metrics(employee_id=None, department=None):
@@ -720,16 +725,19 @@ def show_manager_view():
 def show_login():
     st.title("Employee Wellness Portal")
     
+    # Access the global DataFrames
+    global employees_df, check_ins_df, performance_df
+    
     with st.container(border=True):
         st.subheader("Login")
         
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
+        email = st.text_input("Email", placeholder="yourname@company.com")
+        password = st.text_input("Password", type="password", value="password")
         
         if st.button("Login"):
-            # Simple authentication for demo (accepts any email ending with @company.com)
+            # Simple authentication for demo
             if email.endswith('@company.com') and password == "password":
-                # Check if employee exists in dummy data
+                # Find employee in our data
                 emp = employees_df[employees_df['email'] == email]
                 
                 if not emp.empty:
@@ -738,26 +746,63 @@ def show_login():
                     st.session_state.current_employee_id = emp['id'].values[0]
                     st.session_state.current_employee_name = emp['name'].values[0]
                     st.session_state.is_manager = emp['manager'].values[0]
+                    st.session_state.current_page = "dashboard"
+                    st.rerun()
                 else:
-                    # Create a new dummy employee if not found
+                    # Create new employee if not found
+                    new_id = len(employees_df) + 1
                     new_emp = {
-                        'id': len(employees_df) + 1,
-                        'name': email.split('@')[0].title(),
+                        'id': new_id,
+                        'name': email.split('@')[0].capitalize(),
                         'department': random.choice(['Engineering', 'Marketing', 'HR']),
                         'role': 'Employee',
                         'email': email,
-                        'join_date': fake.date_between(start_date='-1y', end_date='today'),
+                        'join_date': datetime.now().date(),
                         'manager': False
                     }
-                    employees_df.loc[len(employees_df)] = new_emp
                     
+                    # Add to employees_df
+                    employees_df = pd.concat([
+                        employees_df, 
+                        pd.DataFrame([new_emp])
+                    ], ignore_index=True)
+                    
+                    # Create initial check-in data
+                    new_check_in = {
+                        'employee_id': new_id,
+                        'date': datetime.now().date(),
+                        'stress': 5,
+                        'energy': 5,
+                        'motivation': 5,
+                        'work_enjoyment': 5,
+                        'notes': "New employee initial check-in"
+                    }
+                    check_ins_df = pd.concat([
+                        check_ins_df,
+                        pd.DataFrame([new_check_in])
+                    ], ignore_index=True)
+                    
+                    # Create performance data
+                    new_performance = {
+                        'employee_id': new_id,
+                        'month': datetime.now().month,
+                        'kpi': 75,
+                        'projects_completed': 1,
+                        'feedback_score': 4,
+                        'overtime_hours': 0
+                    }
+                    performance_df = pd.concat([
+                        performance_df,
+                        pd.DataFrame([new_performance])
+                    ], ignore_index=True)
+                    
+                    # Set session state
                     st.session_state.logged_in = True
-                    st.session_state.current_employee_id = new_emp['id']
+                    st.session_state.current_employee_id = new_id
                     st.session_state.current_employee_name = new_emp['name']
                     st.session_state.is_manager = False
-                
-                st.session_state.current_page = "dashboard"
-                st.rerun()
+                    st.session_state.current_page = "dashboard"
+                    st.rerun()
             else:
                 st.error("Invalid credentials. Use any email ending with @company.com and password 'password'")
 
