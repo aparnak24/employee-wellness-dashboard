@@ -703,21 +703,39 @@ def show_login():
         password = st.text_input("Password", type="password")
         
         if st.button("Login"):
-            # Simple authentication for demo
+            # Simple authentication for demo (accepts any email ending with @company.com)
             if email.endswith('@company.com') and password == "password":
-                # Find employee in our dummy data
+                # Check if employee exists in dummy data
                 emp = employees_df[employees_df['email'] == email]
+                
                 if not emp.empty:
+                    # Existing employee
                     st.session_state.logged_in = True
                     st.session_state.current_employee_id = emp['id'].values[0]
                     st.session_state.current_employee_name = emp['name'].values[0]
                     st.session_state.is_manager = emp['manager'].values[0]
-                    st.session_state.current_page = "dashboard"
-                    st.rerun()
                 else:
-                    st.error("Employee not found in records")
+                    # Create a new dummy employee if not found
+                    new_emp = {
+                        'id': len(employees_df) + 1,
+                        'name': email.split('@')[0].title(),
+                        'department': random.choice(['Engineering', 'Marketing', 'HR']),
+                        'role': 'Employee',
+                        'email': email,
+                        'join_date': fake.date_between(start_date='-1y', end_date='today'),
+                        'manager': False
+                    }
+                    employees_df.loc[len(employees_df)] = new_emp
+                    
+                    st.session_state.logged_in = True
+                    st.session_state.current_employee_id = new_emp['id']
+                    st.session_state.current_employee_name = new_emp['name']
+                    st.session_state.is_manager = False
+                
+                st.session_state.current_page = "dashboard"
+                st.rerun()
             else:
-                st.error("Invalid credentials. Try email ending with @company.com and password 'password'")
+                st.error("Invalid credentials. Use any email ending with @company.com and password 'password'")
 
 # Main app logic
 def main():
