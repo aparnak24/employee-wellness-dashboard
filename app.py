@@ -207,61 +207,68 @@ def show_dashboard(employee_id=None, is_manager=False):
     st.subheader("Mood-Performance Correlation")
     
     if employee_id:
-        # Individual view
-        emp_check_ins = check_ins_df[check_ins_df['employee_id'] == employee_id]
-        emp_performance = performance_df[performance_df['employee_id'] == employee_id]
-        
-        # Merge data by month
-        emp_check_ins['month'] = pd.to_datetime(emp_check_ins['date']).dt.month
-        monthly_mood = emp_check_ins.groupby('month')[['stress', 'energy', 'motivation', 'work_enjoyment']].mean().reset_index()
-        merged_data = pd.merge(monthly_mood, emp_performance, on='month')
-        
-        fig = go.Figure()
-        
-        # Add KPI line
-        fig.add_trace(go.Scatter(
-            x=merged_data['month'],
-            y=merged_data['kpi'],
-            name="Performance KPI",
-            line=dict(color='royalblue', width=2)
-        ))
-        
-        # Add mood score (work_enjoyment) line
-        fig.add_trace(go.Scatter(
-            x=merged_data['month'],
-            y=merged_data['work_enjoyment']*10,
-            name="Work Enjoyment (Mood)",
-            line=dict(color='green', width=2),
-            yaxis="y2"
-        ))
-        
-        # Add annotations
-        max_kpi_month = merged_data.loc[merged_data['kpi'].idxmax(), 'month']
-        fig.add_annotation(
-            x=max_kpi_month,
-            y=merged_data.loc[merged_data['month'] == max_kpi_month, 'kpi'].values[0],
-            text="Peak performance",
-            showarrow=True,
-            arrowhead=1
-        )
-        
-        fig.update_layout(
-            title="Your Monthly Performance vs Mood",
-            xaxis_title="Month",
-            yaxis_title="Performance KPI",
-            yaxis2=dict(
-                title="Mood Score",
-                overlaying="y",
-                side="right",
-                range=[0, 10]
-            ),
-            hovermode="x unified"
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
+        # Individual view with error handling
+        try:
+            emp_check_ins = check_ins_df[check_ins_df['employee_id'] == employee_id].copy()
+            emp_performance = performance_df[performance_df['employee_id'] == employee_id].copy()
+            
+            if not emp_check_ins.empty and not emp_performance.empty:
+                # Convert date to month
+                emp_check_ins['month'] = pd.to_datetime(emp_check_ins['date']).dt.month
+                monthly_mood = emp_check_ins.groupby('month')[['stress', 'energy', 'motivation', 'work_enjoyment']].mean().reset_index()
+                merged_data = pd.merge(monthly_mood, emp_performance, on='month')
+                
+                fig = go.Figure()
+                
+                # Add KPI line
+                fig.add_trace(go.Scatter(
+                    x=merged_data['month'],
+                    y=merged_data['kpi'],
+                    name="Performance KPI",
+                    line=dict(color='royalblue', width=2)
+                ))
+                
+                # Add mood score line
+                fig.add_trace(go.Scatter(
+                    x=merged_data['month'],
+                    y=merged_data['work_enjoyment']*10,
+                    name="Work Enjoyment",
+                    line=dict(color='green', width=2),
+                    yaxis="y2"
+                ))
+                
+                # Only add annotation if we have data
+                if not merged_data.empty:
+                    max_kpi_month = merged_data.loc[merged_data['kpi'].idxmax(), 'month']
+                    fig.add_annotation(
+                        x=max_kpi_month,
+                        y=merged_data.loc[merged_data['month'] == max_kpi_month, 'kpi'].values[0],
+                        text="Peak performance",
+                        showarrow=True,
+                        arrowhead=1
+                    )
+                
+                fig.update_layout(
+                    title="Your Monthly Performance vs Mood",
+                    xaxis_title="Month",
+                    yaxis_title="Performance KPI",
+                    yaxis2=dict(
+                        title="Mood Score",
+                        overlaying="y",
+                        side="right",
+                        range=[0, 10]
+                    ),
+                    hovermode="x unified"
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning("Not enough data to show performance trends yet")
+        except Exception as e:
+            st.error(f"Could not generate performance chart: {str(e)}")
     
     else:
-        # Team view
+        # Team view (unchanged)
         dept = st.selectbox("Select Department", employees_df['department'].unique())
         dept_metrics = calculate_metrics(department=dept)
         
