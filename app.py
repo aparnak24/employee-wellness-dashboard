@@ -19,25 +19,29 @@ st.set_page_config(
 )
 
 # Generate dummy data for multiple department managers
-# In generate_dummy_data() function, modify the check-in generation:
-for emp in employees:
-    # Ensure each employee has at least 5 check-ins
-    for days_ago in range(5, 35):  # Last 30 days but skip first 5 to ensure recency
-        date = datetime.now() - timedelta(days=days_ago)
-        check_in_data.append({
-            'employee_id': emp['id'],
-            'date': date.date(),
-            'stress': random.randint(1, 10),
-            'energy': random.randint(1, 10),
-            'motivation': random.randint(1, 10),
-            'work_enjoyment': random.randint(1, 10),
-            'notes': random.choice(["", fake.sentence(), ""])
+def generate_dummy_data():
+    departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Product']
+    roles = ['Manager', 'Senior', 'Mid-level', 'Junior']
+    
+    employees = []
+    for i in range(50):
+        dept = random.choice(departments)
+        role = random.choice(roles)
+        employees.append({
+            'id': i+1,
+            'name': fake.name(),
+            'department': dept,
+            'role': role,
+            'email': fake.email(),
+            'join_date': fake.date_between(start_date='-5y', end_date='today'),
+            'manager': random.choice([True, False]) if role == 'Manager' else False
         })
     
     # Create check-in data for last 30 days
     check_in_data = []
     for emp in employees:
-        for days_ago in range(30):
+        # Ensure each employee has at least 5 check-ins
+        for days_ago in range(5, 35):  # Last 30 days but skip first 5 to ensure recency
             date = datetime.now() - timedelta(days=days_ago)
             check_in_data.append({
                 'employee_id': emp['id'],
@@ -62,17 +66,18 @@ for emp in employees:
                 'overtime_hours': random.randint(0, 30)
             })
     
+    # Return all data as a dictionary
     return {
         'employees': pd.DataFrame(employees),
         'check_ins': pd.DataFrame(check_in_data),
         'performance': pd.DataFrame(performance_data)
     }
 
-# Load dummy data
-data = generate_dummy_data()
-employees_df = data['employees']
-check_ins_df = data['check_ins']
-performance_df = data['performance']
+# # Load dummy data
+# data = generate_dummy_data()
+# employees_df = data['employees']
+# check_ins_df = data['check_ins']
+# performance_df = data['performance']
 
 # Calculate derived metrics
 def calculate_metrics(employee_id=None, department=None):
